@@ -11,17 +11,19 @@ A Model Context Protocol (MCP) server wrapping the [Finnhub API](https://finnhub
 
 ## Installation
 
-### Using npx (recommended)
+### Using npx with GitHub (recommended)
+
+Run directly from GitHub without cloning or installing:
 
 ```bash
-npx finnhub-mcp --api-key YOUR_FINNHUB_API_KEY
+npx github:ach968/finnhub-mcp --api-key YOUR_FINNHUB_API_KEY
 ```
 
 ### Local Development
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/finnhub-mcp.git
+git clone https://github.com/ach968/finnhub-mcp.git
 cd finnhub-mcp
 
 # Install dependencies
@@ -35,7 +37,7 @@ bun run dev -- --api-key YOUR_FINNHUB_API_KEY
 
 Add to your OpenCode config (`~/.config/opencode/opencode.json`):
 
-### Using npx
+### Using npx with GitHub
 
 ```json
 {
@@ -45,7 +47,7 @@ Add to your OpenCode config (`~/.config/opencode/opencode.json`):
       "type": "local",
       "command": [
         "npx",
-        "finnhub-mcp",
+        "github:ach968/finnhub-mcp",
         "--api-key",
         "YOUR_FINNHUB_API_KEY"
       ],
@@ -64,7 +66,7 @@ Add to your OpenCode config (`~/.config/opencode/opencode.json`):
       "type": "local",
       "command": [
         "npx",
-        "finnhub-mcp"
+        "github:ach968/finnhub-mcp"
       ],
       "environment": {
         "FINNHUB_API_KEY": "YOUR_API_KEY"
