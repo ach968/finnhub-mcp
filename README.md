@@ -1,6 +1,6 @@
 # Finnhub MCP Server
 
-A Model Context Protocol (MCP) server wrapping the [Finnhub API](https://finnhub.io/docs/api) for financial market data. Built with TypeScript and Bun.
+A Model Context Protocol (MCP) server wrapping the [Finnhub API](https://finnhub.io/docs/api) for financial market data. 
 
 ## Features
 
