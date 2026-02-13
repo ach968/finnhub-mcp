@@ -1,0 +1,41 @@
+{
+  "name": "finnhub-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Finnhub API - earnings calendar and financial data",
+  "type": "module",
+  "bin": {
+    "finnhub-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts --outfile ./dist/index.js --target bun",
+    "dev": "bun --watch ./src/index.ts",
+    "start": "bun ./src/index.ts",
+    "typecheck": "bun tsc --noEmit",
+    "lint": "bun tsc --noEmit",
+    "prepare": "bun run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.3.0"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "mcp",
+    "finnhub",
+    "earnings",
+    "stocks",
+    "finance"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}
