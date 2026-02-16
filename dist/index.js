@@ -16484,6 +16484,149 @@ class FinnhubClient {
       dateRange: { from, to }
     };
   }
+  async getQuotes(args) {
+    const quotes = [];
+    for (const symbol of args.symbols) {
+      const upperSymbol = symbol.toUpperCase();
+      const response = await this.request("/quote", { symbol: upperSymbol });
+      if (response.pc !== 0 || response.c !== 0) {
+        quotes.push(this.normalizeQuote(upperSymbol, response));
+      }
+    }
+    return { quotes };
+  }
+  async getQuoteHistory(args) {
+    const fromTimestamp = Math.floor(new Date(args.from).getTime() / 1000);
+    const toTimestamp = Math.floor(new Date(args.to).getTime() / 1000);
+    const response = await this.request("/stock/candles", {
+      symbol: args.symbol.toUpperCase(),
+      resolution: args.resolution,
+      from: fromTimestamp.toString(),
+      to: toTimestamp.toString()
+    });
+    if (response.s === "no_data") {
+      return {
+        symbol: args.symbol.toUpperCase(),
+        resolution: args.resolution,
+        candles: [],
+        count: 0
+      };
+    }
+    const candles = response.t.map((timestamp, index) => ({
+      timestamp,
+      open: response.o[index],
+      high: response.h[index],
+      low: response.l[index],
+      close: response.c[index],
+      volume: response.v[index]
+    }));
+    return {
+      symbol: args.symbol.toUpperCase(),
+      resolution: args.resolution,
+      candles,
+      count: candles.length
+    };
+  }
+  async getNews(args) {
+    const response = await this.request("/company-news", {
+      symbol: args.symbol.toUpperCase(),
+      from: args.from,
+      to: args.to
+    });
+    const news = response.map((item) => this.normalizeNews(item));
+    return {
+      news,
+      count: news.length
+    };
+  }
+  async getStockProfile(args) {
+    const response = await this.request("/stock/profile2", { symbol: args.symbol.toUpperCase() });
+    if (!response.ticker) {
+      return { profile: null };
+    }
+    return {
+      profile: this.normalizeProfile(response)
+    };
+  }
+  async getOptionsChain(args) {
+    const params = {
+      symbol: args.symbol.toUpperCase()
+    };
+    if (args.expirationDate) {
+      params.expirationDate = args.expirationDate;
+    }
+    const response = await this.request("/stock/option-chain", params);
+    const options = (response.data || []).map((opt) => this.normalizeOption(opt));
+    return {
+      chain: {
+        options,
+        availableExpirationDates: response.expirationDate || []
+      }
+    };
+  }
+  normalizeQuote(symbol, quote) {
+    return {
+      symbol,
+      currentPrice: quote.c,
+      change: quote.d ?? 0,
+      percentChange: quote.dp ?? 0,
+      high: quote.h,
+      low: quote.l,
+      open: quote.o,
+      previousClose: quote.pc,
+      timestamp: quote.t
+    };
+  }
+  normalizeNews(news) {
+    return {
+      headline: news.headine,
+      summary: news.summary,
+      source: news.source,
+      url: news.url,
+      datetime: news.datetime,
+      image: news.image,
+      related: news.related,
+      category: news.category
+    };
+  }
+  normalizeProfile(profile) {
+    return {
+      name: profile.name || "",
+      ticker: profile.ticker || "",
+      exchange: profile.exchange || "",
+      industry: profile.finnhubIndustry || profile.industry || "",
+      weburl: profile.weburl || "",
+      logo: profile.logo || profile.logo_url || "",
+      description: profile.description || "",
+      marketCap: profile.marketCapitalization || 0,
+      sharesOutstanding: profile.shareOutstanding || 0,
+      ipoDate: profile.ipo || profile.ipoDate || "",
+      currency: profile.currency || "",
+      country: profile.country || "",
+      phone: profile.phone || profile.phoneNumber || ""
+    };
+  }
+  normalizeOption(option) {
+    return {
+      contractId: option.contractID,
+      strike: option.strike,
+      expirationDate: option.expirationDate,
+      type: option.optionType,
+      bid: option.bids && option.bids.length > 0 ? option.bids[0] : null,
+      ask: option.asks && option.asks.length > 0 ? option.asks[0] : null,
+      last: option.last,
+      openInterest: option.openInterest,
+      volume: option.volume,
+      impliedVolatility: option.iv,
+      greeks: {
+        delta: option.delta,
+        gamma: option.gamma,
+        theta: option.theta,
+        rho: option.rho,
+        vega: option.vega
+      }
+    };
+  }
   normalizeEarnings(item) {
     const epsSurprise = item.epsActual !== null && item.epsEstimate !== null ? item.epsActual - item.epsEstimate : null;
     const epsSurprisePercent = epsSurprise !== null && item.epsEstimate !== null && item.epsEstimate !== 0 ? epsSurprise / item.epsEstimate * 100 : null;
@@ -16523,6 +16666,27 @@ var EarningsCalendarArgsSchema = exports_external.object({
   from: exports_external.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional().describe("Start date in YYYY-MM-DD format"),
   to: exports_external.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional().describe("End date in YYYY-MM-DD format"),
   symbol: exports_external.string().min(1).max(10).optional().describe("Stock symbol to filter by (e.g., 'AAPL')")
+});
+var QuoteArgsSchema = exports_external.object({
+  symbols: exports_external.array(exports_external.string().min(1).max(10)).min(1).max(50).describe("Array of stock symbols to get quotes for (e.g., ['AAPL', 'GOOGL'])")
+});
+var QuoteHistoryArgsSchema = exports_external.object({
+  symbol: exports_external.string().min(1).max(10).describe("Stock symbol (e.g., 'AAPL')"),
+  from: exports_external.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").describe("Start date in YYYY-MM-DD format"),
+  to: exports_external.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").describe("End date in YYYY-MM-DD format"),
+  resolution: exports_external.enum(["1", "5", "15", "30", "60", "D", "W", "M"]).default("D").describe("Candle resolution: 1, 5, 15, 30, 60 (minutes), D (daily), W (weekly), M (monthly)")
+});
+var NewsArgsSchema = exports_external.object({
+  symbol: exports_external.string().min(1).max(10).describe("Stock symbol (e.g., 'AAPL')"),
+  from: exports_external.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").describe("Start date in YYYY-MM-DD format"),
+  to: exports_external.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").describe("End date in YYYY-MM-DD format")
+});
+var StockProfileArgsSchema = exports_external.object({
+  symbol: exports_external.string().min(1).max(10).describe("Stock symbol (e.g., 'AAPL')")
+});
+var OptionsChainArgsSchema = exports_external.object({
+  symbol: exports_external.string().min(1).max(10).describe("Stock symbol (e.g., 'AAPL')"),
+  expirationDate: exports_external.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").optional().describe("Expiration date in YYYY-MM-DD format (optional)")
 });
 
 // src/index.ts
@@ -16575,6 +16739,107 @@ function createServer(config2) {
           }
         }
       }
+    },
+    {
+      name: "finnhub.quote",
+      description: "Get real-time quote data for multiple stock symbols. Returns current price, daily change, volume, and other quote data.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          symbols: {
+            type: "array",
+            items: {
+              type: "string"
+            },
+            description: "Array of stock symbols (e.g., ['AAPL', 'GOOGL', 'MSFT'])",
+            minItems: 1,
+            maxItems: 50
+          }
+        },
+        required: ["symbols"]
+      }
+    },
+    {
+      name: "finnhub.quote.history",
+      description: "Get historical candlestick data for a stock symbol. Returns OHLCV (Open, High, Low, Close, Volume) data.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          symbol: {
+            type: "string",
+            description: "Stock symbol (e.g., 'AAPL')"
+          },
+          from: {
+            type: "string",
+            description: "Start date in YYYY-MM-DD format"
+          },
+          to: {
+            type: "string",
+            description: "End date in YYYY-MM-DD format"
+          },
+          resolution: {
+            type: "string",
+            enum: ["1", "5", "15", "30", "60", "D", "W", "M"],
+            default: "D",
+            description: "Candle resolution: 1,5,15,30,60 (minutes), D (daily), W (weekly), M (monthly)"
+          }
+        },
+        required: ["symbol", "from", "to"]
+      }
+    },
+    {
+      name: "finnhub.news",
+      description: "Get company news for a specific stock symbol within a date range. Returns news articles with headlines, summaries, and URLs.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          symbol: {
+            type: "string",
+            description: "Stock symbol (e.g., 'AAPL')"
+          },
+          from: {
+            type: "string",
+            description: "Start date in YYYY-MM-DD format"
+          },
+          to: {
+            type: "string",
+            description: "End date in YYYY-MM-DD format"
+          }
+        },
+        required: ["symbol", "from", "to"]
+      }
+    },
+    {
+      name: "finnhub.stock.profile",
+      description: "Get company profile and fundamentals for a stock symbol. Returns company details including name, industry, weburl, logo, market cap, and description.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          symbol: {
+            type: "string",
+            description: "Stock symbol (e.g., 'AAPL')"
+          }
+        },
+        required: ["symbol"]
+      }
+    },
+    {
+      name: "finnhub.options.chain",
+      description: "Get options chain for a stock symbol. Returns option contracts with strike prices, expiration dates, bid/ask prices, and Greeks.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          symbol: {
+            type: "string",
+            description: "Stock symbol (e.g., 'AAPL')"
+          },
+          expirationDate: {
+            type: "string",
+            description: "Optional: Expiration date in YYYY-MM-DD format"
+          }
+        },
+        required: ["symbol"]
+      }
     }
   ];
   server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -16599,6 +16864,116 @@ function createServer(config2) {
           };
         }
         const result = await finnhubClient.getEarningsCalendar(parsed.data);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+      if (name === "finnhub.quote") {
+        const parsed = QuoteArgsSchema.safeParse(args);
+        if (!parsed.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({ error: "INVALID_ARGUMENT", message: parsed.error.message }, null, 2)
+              }
+            ]
+          };
+        }
+        const result = await finnhubClient.getQuotes(parsed.data);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+      if (name === "finnhub.quote.history") {
+        const parsed = QuoteHistoryArgsSchema.safeParse(args);
+        if (!parsed.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({ error: "INVALID_ARGUMENT", message: parsed.error.message }, null, 2)
+              }
+            ]
+          };
+        }
+        const result = await finnhubClient.getQuoteHistory(parsed.data);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+      if (name === "finnhub.news") {
+        const parsed = NewsArgsSchema.safeParse(args);
+        if (!parsed.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({ error: "INVALID_ARGUMENT", message: parsed.error.message }, null, 2)
+              }
+            ]
+          };
+        }
+        const result = await finnhubClient.getNews(parsed.data);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+      if (name === "finnhub.stock.profile") {
+        const parsed = StockProfileArgsSchema.safeParse(args);
+        if (!parsed.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({ error: "INVALID_ARGUMENT", message: parsed.error.message }, null, 2)
+              }
+            ]
+          };
+        }
+        const result = await finnhubClient.getStockProfile(parsed.data);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        };
+      }
+      if (name === "finnhub.options.chain") {
+        const parsed = OptionsChainArgsSchema.safeParse(args);
+        if (!parsed.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({ error: "INVALID_ARGUMENT", message: parsed.error.message }, null, 2)
+              }
+            ]
+          };
+        }
+        const result = await finnhubClient.getOptionsChain(parsed.data);
         return {
           content: [
             {

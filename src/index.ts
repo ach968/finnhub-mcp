@@ -17,6 +17,16 @@ import { FinnhubClient } from "./finnhub-client.js";
 import {
   EarningsCalendarArgsSchema,
   type EarningsCalendarArgs,
+  QuoteArgsSchema,
+  type QuoteArgs,
+  QuoteHistoryArgsSchema,
+  type QuoteHistoryArgs,
+  NewsArgsSchema,
+  type NewsArgs,
+  StockProfileArgsSchema,
+  type StockProfileArgs,
+  OptionsChainArgsSchema,
+  type OptionsChainArgs,
 } from "./types.js";
 
 interface ServerConfig {
@@ -90,6 +100,112 @@ function createServer(config: ServerConfig): Server {
         },
       },
     },
+    {
+      name: "finnhub.quote",
+      description:
+        "Get real-time quote data for multiple stock symbols. Returns current price, daily change, volume, and other quote data.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          symbols: {
+            type: "array",
+            items: {
+              type: "string",
+            },
+            description: "Array of stock symbols (e.g., ['AAPL', 'GOOGL', 'MSFT'])",
+            minItems: 1,
+            maxItems: 50,
+          },
+        },
+        required: ["symbols"],
+      },
+    },
+    {
+      name: "finnhub.quote.history",
+      description:
+        "Get historical candlestick data for a stock symbol. Returns OHLCV (Open, High, Low, Close, Volume) data.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          symbol: {
+            type: "string",
+            description: "Stock symbol (e.g., 'AAPL')",
+          },
+          from: {
+            type: "string",
+            description: "Start date in YYYY-MM-DD format",
+          },
+          to: {
+            type: "string",
+            description: "End date in YYYY-MM-DD format",
+          },
+          resolution: {
+            type: "string",
+            enum: ["1", "5", "15", "30", "60", "D", "W", "M"],
+            default: "D",
+            description: "Candle resolution: 1,5,15,30,60 (minutes), D (daily), W (weekly), M (monthly)",
+          },
+        },
+        required: ["symbol", "from", "to"],
+      },
+    },
+    {
+      name: "finnhub.news",
+      description:
+        "Get company news for a specific stock symbol within a date range. Returns news articles with headlines, summaries, and URLs.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          symbol: {
+            type: "string",
+            description: "Stock symbol (e.g., 'AAPL')",
+          },
+          from: {
+            type: "string",
+            description: "Start date in YYYY-MM-DD format",
+          },
+          to: {
+            type: "string",
+            description: "End date in YYYY-MM-DD format",
+          },
+        },
+        required: ["symbol", "from", "to"],
+      },
+    },
+    {
+      name: "finnhub.stock.profile",
+      description:
+        "Get company profile and fundamentals for a stock symbol. Returns company details including name, industry, weburl, logo, market cap, and description.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          symbol: {
+            type: "string",
+            description: "Stock symbol (e.g., 'AAPL')",
+          },
+        },
+        required: ["symbol"],
+      },
+    },
+    {
+      name: "finnhub.options.chain",
+      description:
+        "Get options chain for a stock symbol. Returns option contracts with strike prices, expiration dates, bid/ask prices, and Greeks.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          symbol: {
+            type: "string",
+            description: "Stock symbol (e.g., 'AAPL')",
+          },
+          expirationDate: {
+            type: "string",
+            description: "Optional: Expiration date in YYYY-MM-DD format",
+          },
+        },
+        required: ["symbol"],
+      },
+    },
   ];
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -121,6 +237,146 @@ function createServer(config: ServerConfig): Server {
         }
 
         const result = await finnhubClient.getEarningsCalendar(parsed.data);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      if (name === "finnhub.quote") {
+        const parsed = QuoteArgsSchema.safeParse(args);
+        if (!parsed.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  { error: "INVALID_ARGUMENT", message: parsed.error.message },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
+
+        const result = await finnhubClient.getQuotes(parsed.data);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      if (name === "finnhub.quote.history") {
+        const parsed = QuoteHistoryArgsSchema.safeParse(args);
+        if (!parsed.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  { error: "INVALID_ARGUMENT", message: parsed.error.message },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
+
+        const result = await finnhubClient.getQuoteHistory(parsed.data);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      if (name === "finnhub.news") {
+        const parsed = NewsArgsSchema.safeParse(args);
+        if (!parsed.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  { error: "INVALID_ARGUMENT", message: parsed.error.message },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
+
+        const result = await finnhubClient.getNews(parsed.data);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      if (name === "finnhub.stock.profile") {
+        const parsed = StockProfileArgsSchema.safeParse(args);
+        if (!parsed.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  { error: "INVALID_ARGUMENT", message: parsed.error.message },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
+
+        const result = await finnhubClient.getStockProfile(parsed.data);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(result, null, 2),
+            },
+          ],
+        };
+      }
+
+      if (name === "finnhub.options.chain") {
+        const parsed = OptionsChainArgsSchema.safeParse(args);
+        if (!parsed.success) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  { error: "INVALID_ARGUMENT", message: parsed.error.message },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
+
+        const result = await finnhubClient.getOptionsChain(parsed.data);
         return {
           content: [
             {
