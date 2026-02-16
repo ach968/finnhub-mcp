@@ -16556,11 +16556,42 @@ class FinnhubClient {
       params.expirationDate = args.expirationDate;
     }
     const response = await this.request("/stock/option-chain", params);
-    const options = (response.data || []).map((opt) => this.normalizeOption(opt));
+    const allOptions = [];
+    const expirationDates = [];
+    for (const item of response.data || []) {
+      expirationDates.push(item.expirationDate);
+      for (const opt of item.options.CALL || []) {
+        allOptions.push(this.normalizeOptionContract(opt, "call"));
+      }
+      for (const opt of item.options.PUT || []) {
+        allOptions.push(this.normalizeOptionContract(opt, "put"));
+      }
+    }
     return {
       chain: {
-        options,
-        availableExpirationDates: response.expirationDate || []
+        options: allOptions,
+        availableExpirationDates: expirationDates
+      }
+    };
+  }
+  normalizeOptionContract(opt, type) {
+    return {
+      contractName: opt.contractName,
+      strike: opt.strike,
+      expirationDate: opt.expirationDate,
+      type,
+      bid: opt.bid || null,
+      ask: opt.ask || null,
+      last: opt.lastPrice || null,
+      openInterest: opt.openInterest,
+      volume: opt.volume,
+      impliedVolatility: opt.impliedVolatility,
+      greeks: {
+        delta: opt.delta ?? null,
+        gamma: opt.gamma ?? null,
+        theta: opt.theta ?? null,
+        rho: opt.rho ?? null,
+        vega: opt.vega ?? null
       }
     };
   }
@@ -16604,27 +16635,6 @@ class FinnhubClient {
       currency: profile.currency || "",
       country: profile.country || "",
       phone: profile.phone || profile.phoneNumber || ""
-    };
-  }
-  normalizeOption(option) {
-    return {
-      contractId: option.contractID,
-      strike: option.strike,
-      expirationDate: option.expirationDate,
-      type: option.optionType,
-      bid: option.bids && option.bids.length > 0 ? option.bids[0] : null,
-      ask: option.asks && option.asks.length > 0 ? option.asks[0] : null,
-      last: option.last,
-      openInterest: option.openInterest,
-      volume: option.volume,
-      impliedVolatility: option.iv,
-      greeks: {
-        delta: option.delta,
-        gamma: option.gamma,
-        theta: option.theta,
-        rho: option.rho,
-        vega: option.vega
-      }
     };
   }
   normalizeEarnings(item) {

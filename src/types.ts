@@ -291,35 +291,45 @@ export interface NormalizedProfile {
 }
 
 /**
- * Option contract from Finnhub API
+ * Option contract from Finnhub API (inside options.CALL or options.PUT)
  */
-export interface FinnhubOption {
-  contractID: number;
-  exerciseStyle: string;
-  expirationDate: number;
-  mnyBtm: string;
-  optionType: string;
+export interface FinnhubOptionContract {
+  contractName: string;
+  contractSize: number;
+  contractPeriod: string;
+  currency: string;
+  type: string;
+  inTheMoney: boolean;
+  lastTradeDateTime: string;
+  expirationDate: string;
   strike: number;
-  bids: number[];
-  asks: number[];
-  last: number;
-  openInterest: number;
+  lastPrice: number;
+  bid: number;
+  ask: number;
+  change: number;
+  changePercent: number;
   volume: number;
-  iv: number;
+  openInterest: number;
+  impliedVolatility: number;
   delta: number;
   gamma: number;
   theta: number;
-  rho: number;
   vega: number;
+  rho: number;
+  theoretical: number;
+  intrinsicValue: number;
+  timeValue: number;
+  updatedAt: string;
+  daysBeforeExpiration: number;
 }
 
 /**
  * Normalized option contract
  */
 export interface NormalizedOption {
-  contractId: number;
+  contractName: string;
   strike: number;
-  expirationDate: number;
+  expirationDate: string;
   type: string;
   bid: number | null;
   ask: number | null;
@@ -339,9 +349,28 @@ export interface NormalizedOption {
 /**
  * Finnhub options chain response
  */
+export interface FinnhubOptionsChainDataItem {
+  expirationDate: string;
+  impliedVolatility: number;
+  putVolume: number;
+  callVolume: number;
+  putCallVolumeRatio: number;
+  putOpenInterest: number;
+  callOpenInterest: number;
+  putCallOpenInterestRatio: number;
+  optionsCount: number;
+  options: {
+    CALL: FinnhubOptionContract[];
+    PUT: FinnhubOptionContract[];
+  };
+}
+
 export interface FinnhubOptionsChain {
-  data: FinnhubOption[];
-  expirationDate: string[];
+  code: string;
+  exchange: string;
+  lastTradeDate: string;
+  lastTradePrice: number;
+  data: FinnhubOptionsChainDataItem[];
 }
 
 /**
