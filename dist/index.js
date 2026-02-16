@@ -16495,38 +16495,6 @@ class FinnhubClient {
     }
     return { quotes };
   }
-  async getQuoteHistory(args) {
-    const fromTimestamp = Math.floor(new Date(args.from).getTime() / 1000);
-    const toTimestamp = Math.floor(new Date(args.to).getTime() / 1000);
-    const response = await this.request("/stock/candles", {
-      symbol: args.symbol.toUpperCase(),
-      resolution: args.resolution,
-      from: fromTimestamp.toString(),
-      to: toTimestamp.toString()
-    });
-    if (response.s === "no_data") {
-      return {
-        symbol: args.symbol.toUpperCase(),
-        resolution: args.resolution,
-        candles: [],
-        count: 0
-      };
-    }
-    const candles = response.t.map((timestamp, index) => ({
-      timestamp,
-      open: response.o[index],
-      high: response.h[index],
-      low: response.l[index],
-      close: response.c[index],
-      volume: response.v[index]
-    }));
-    return {
-      symbol: args.symbol.toUpperCase(),
-      resolution: args.resolution,
-      candles,
-      count: candles.length
-    };
-  }
   async getNews(args) {
     const response = await this.request("/company-news", {
       symbol: args.symbol.toUpperCase(),
@@ -16680,12 +16648,6 @@ var EarningsCalendarArgsSchema = exports_external.object({
 var QuoteArgsSchema = exports_external.object({
   symbols: exports_external.array(exports_external.string().min(1).max(10)).min(1).max(50).describe("Array of stock symbols to get quotes for (e.g., ['AAPL', 'GOOGL'])")
 });
-var QuoteHistoryArgsSchema = exports_external.object({
-  symbol: exports_external.string().min(1).max(10).describe("Stock symbol (e.g., 'AAPL')"),
-  from: exports_external.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").describe("Start date in YYYY-MM-DD format"),
-  to: exports_external.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").describe("End date in YYYY-MM-DD format"),
-  resolution: exports_external.enum(["1", "5", "15", "30", "60", "D", "W", "M"]).default("D").describe("Candle resolution: 1, 5, 15, 30, 60 (minutes), D (daily), W (weekly), M (monthly)")
-});
 var NewsArgsSchema = exports_external.object({
   symbol: exports_external.string().min(1).max(10).describe("Stock symbol (e.g., 'AAPL')"),
   from: exports_external.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format").describe("Start date in YYYY-MM-DD format"),
@@ -16767,34 +16729,6 @@ function createServer(config2) {
           }
         },
         required: ["symbols"]
-      }
-    },
-    {
-      name: "finnhub.quote.history",
-      description: "Get historical candlestick data for a stock symbol. Returns OHLCV (Open, High, Low, Close, Volume) data.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          symbol: {
-            type: "string",
-            description: "Stock symbol (e.g., 'AAPL')"
-          },
-          from: {
-            type: "string",
-            description: "Start date in YYYY-MM-DD format"
-          },
-          to: {
-            type: "string",
-            description: "End date in YYYY-MM-DD format"
-          },
-          resolution: {
-            type: "string",
-            enum: ["1", "5", "15", "30", "60", "D", "W", "M"],
-            default: "D",
-            description: "Candle resolution: 1,5,15,30,60 (minutes), D (daily), W (weekly), M (monthly)"
-          }
-        },
-        required: ["symbol", "from", "to"]
       }
     },
     {
@@ -16896,28 +16830,6 @@ function createServer(config2) {
           };
         }
         const result = await finnhubClient.getQuotes(parsed.data);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result, null, 2)
-            }
-          ]
-        };
-      }
-      if (name === "finnhub.quote.history") {
-        const parsed = QuoteHistoryArgsSchema.safeParse(args);
-        if (!parsed.success) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify({ error: "INVALID_ARGUMENT", message: parsed.error.message }, null, 2)
-              }
-            ]
-          };
-        }
-        const result = await finnhubClient.getQuoteHistory(parsed.data);
         return {
           content: [
             {

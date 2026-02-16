@@ -6,9 +6,6 @@ import type {
   QuoteArgs,
   FinnhubQuote,
   NormalizedQuote,
-  QuoteHistoryArgs,
-  FinnhubCandles,
-  NormalizedCandle,
   NewsArgs,
   FinnhubNews,
   NormalizedNews,
@@ -122,54 +119,6 @@ export class FinnhubClient {
     }
 
     return { quotes };
-  }
-
-  /**
-   * Get historical candlestick data
-   */
-  async getQuoteHistory(args: QuoteHistoryArgs): Promise<{
-    symbol: string;
-    resolution: string;
-    candles: NormalizedCandle[];
-    count: number;
-  }> {
-    const fromTimestamp = Math.floor(new Date(args.from).getTime() / 1000);
-    const toTimestamp = Math.floor(new Date(args.to).getTime() / 1000);
-
-    const response = await this.request<FinnhubCandles>(
-      "/stock/candles",
-      {
-        symbol: args.symbol.toUpperCase(),
-        resolution: args.resolution,
-        from: fromTimestamp.toString(),
-        to: toTimestamp.toString(),
-      }
-    );
-
-    if (response.s === "no_data") {
-      return {
-        symbol: args.symbol.toUpperCase(),
-        resolution: args.resolution,
-        candles: [],
-        count: 0,
-      };
-    }
-
-    const candles: NormalizedCandle[] = response.t.map((timestamp, index) => ({
-      timestamp,
-      open: response.o[index],
-      high: response.h[index],
-      low: response.l[index],
-      close: response.c[index],
-      volume: response.v[index],
-    }));
-
-    return {
-      symbol: args.symbol.toUpperCase(),
-      resolution: args.resolution,
-      candles,
-      count: candles.length,
-    };
   }
 
   /**

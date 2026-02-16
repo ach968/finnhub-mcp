@@ -38,31 +38,6 @@ export const QuoteArgsSchema = z.object({
 export type QuoteArgs = z.infer<typeof QuoteArgsSchema>;
 
 /**
- * Input arguments for the quote history tool
- */
-export const QuoteHistoryArgsSchema = z.object({
-  symbol: z
-    .string()
-    .min(1)
-    .max(10)
-    .describe("Stock symbol (e.g., 'AAPL')"),
-  from: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
-    .describe("Start date in YYYY-MM-DD format"),
-  to: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
-    .describe("End date in YYYY-MM-DD format"),
-  resolution: z
-    .enum(["1", "5", "15", "30", "60", "D", "W", "M"])
-    .default("D")
-    .describe("Candle resolution: 1, 5, 15, 30, 60 (minutes), D (daily), W (weekly), M (monthly)"),
-});
-
-export type QuoteHistoryArgs = z.infer<typeof QuoteHistoryArgsSchema>;
-
-/**
  * Input arguments for the news tool
  */
 export const NewsArgsSchema = z.object({
@@ -186,31 +161,6 @@ export interface NormalizedQuote {
   open: number;
   previousClose: number;
   timestamp: number;
-}
-
-/**
- * Raw candles response from Finnhub API
- */
-export interface FinnhubCandles {
-  c: number[];
-  h: number[];
-  l: number[];
-  o: number[];
-  s: string;
-  t: number[];
-  v: number[];
-}
-
-/**
- * Normalized candle data
- */
-export interface NormalizedCandle {
-  timestamp: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
 }
 
 /**
