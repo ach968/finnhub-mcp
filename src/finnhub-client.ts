@@ -3,6 +3,23 @@ import type {
   EarningsCalendarResponse,
   EarningsAnnouncement,
   NormalizedEarnings,
+  QuoteArgs,
+  FinnhubQuote,
+  NormalizedQuote,
+  QuoteHistoryArgs,
+  FinnhubCandles,
+  NormalizedCandle,
+  NewsArgs,
+  FinnhubNews,
+  NormalizedNews,
+  StockProfileArgs,
+  FinnhubProfile,
+  NormalizedProfile,
+  OptionsChainArgs,
+  FinnhubOptionsChain,
+  FinnhubOption,
+  NormalizedOption,
+  NormalizedOptionsChain,
 } from "./types.js";
 
 /**
@@ -81,6 +98,231 @@ export class FinnhubClient {
       data: normalized,
       count: normalized.length,
       dateRange: { from, to },
+    };
+  }
+
+  /**
+   * Get real-time quotes for multiple symbols
+   */
+  async getQuotes(args: QuoteArgs): Promise<{
+    quotes: NormalizedQuote[];
+  }> {
+    const quotes: NormalizedQuote[] = [];
+
+    for (const symbol of args.symbols) {
+      const upperSymbol = symbol.toUpperCase();
+      const response = await this.request<FinnhubQuote>(
+        "/quote",
+        { symbol: upperSymbol }
+      );
+
+      if (response.pc !== 0 || response.c !== 0) {
+        quotes.push(this.normalizeQuote(upperSymbol, response));
+      }
+    }
+
+    return { quotes };
+  }
+
+  /**
+   * Get historical candlestick data
+   */
+  async getQuoteHistory(args: QuoteHistoryArgs): Promise<{
+    symbol: string;
+    resolution: string;
+    candles: NormalizedCandle[];
+    count: number;
+  }> {
+    const fromTimestamp = Math.floor(new Date(args.from).getTime() / 1000);
+    const toTimestamp = Math.floor(new Date(args.to).getTime() / 1000);
+
+    const response = await this.request<FinnhubCandles>(
+      "/stock/candles",
+      {
+        symbol: args.symbol.toUpperCase(),
+        resolution: args.resolution,
+        from: fromTimestamp.toString(),
+        to: toTimestamp.toString(),
+      }
+    );
+
+    if (response.s === "no_data") {
+      return {
+        symbol: args.symbol.toUpperCase(),
+        resolution: args.resolution,
+        candles: [],
+        count: 0,
+      };
+    }
+
+    const candles: NormalizedCandle[] = response.t.map((timestamp, index) => ({
+      timestamp,
+      open: response.o[index],
+      high: response.h[index],
+      low: response.l[index],
+      close: response.c[index],
+      volume: response.v[index],
+    }));
+
+    return {
+      symbol: args.symbol.toUpperCase(),
+      resolution: args.resolution,
+      candles,
+      count: candles.length,
+    };
+  }
+
+  /**
+   * Get company news
+   */
+  async getNews(args: NewsArgs): Promise<{
+    news: NormalizedNews[];
+    count: number;
+  }> {
+    const response = await this.request<FinnhubNews[]>(
+      "/company-news",
+      {
+        symbol: args.symbol.toUpperCase(),
+        from: args.from,
+        to: args.to,
+      }
+    );
+
+    const news = response.map((item) => this.normalizeNews(item));
+
+    return {
+      news,
+      count: news.length,
+    };
+  }
+
+  /**
+   * Get company profile/fundamentals
+   */
+  async getStockProfile(args: StockProfileArgs): Promise<{
+    profile: NormalizedProfile | null;
+  }> {
+    const response = await this.request<FinnhubProfile>(
+      "/stock/profile2",
+      { symbol: args.symbol.toUpperCase() }
+    );
+
+    if (!response.ticker) {
+      return { profile: null };
+    }
+
+    return {
+      profile: this.normalizeProfile(response),
+    };
+  }
+
+  /**
+   * Get options chain
+   */
+  async getOptionsChain(args: OptionsChainArgs): Promise<{
+    chain: NormalizedOptionsChain;
+  }> {
+    const params: Record<string, string> = {
+      symbol: args.symbol.toUpperCase(),
+    };
+
+    if (args.expirationDate) {
+      params.expirationDate = args.expirationDate;
+    }
+
+    const response = await this.request<FinnhubOptionsChain>(
+      "/stock/option-chain",
+      params
+    );
+
+    const options = (response.data || []).map((opt) =>
+      this.normalizeOption(opt)
+    );
+
+    return {
+      chain: {
+        options,
+        availableExpirationDates: response.expirationDate || [],
+      },
+    };
+  }
+
+  /**
+   * Normalize a single quote
+   */
+  private normalizeQuote(symbol: string, quote: FinnhubQuote): NormalizedQuote {
+    return {
+      symbol,
+      currentPrice: quote.c,
+      change: quote.d ?? 0,
+      percentChange: quote.dp ?? 0,
+      high: quote.h,
+      low: quote.l,
+      open: quote.o,
+      previousClose: quote.pc,
+      timestamp: quote.t,
+    };
+  }
+
+  /**
+   * Normalize a news article
+   */
+  private normalizeNews(news: FinnhubNews): NormalizedNews {
+    return {
+      headline: news.headine,
+      summary: news.summary,
+      source: news.source,
+      url: news.url,
+      datetime: news.datetime,
+      image: news.image,
+      related: news.related,
+      category: news.category,
+    };
+  }
+
+  /**
+   * Normalize a stock profile
+   */
+  private normalizeProfile(profile: FinnhubProfile): NormalizedProfile {
+    return {
+      name: profile.name || "",
+      ticker: profile.ticker || "",
+      exchange: profile.exchange || "",
+      industry: profile.finnhubIndustry || profile.industry || "",
+      weburl: profile.weburl || "",
+      logo: profile.logo || profile.logo_url || "",
+      description: profile.description || "",
+      marketCap: profile.marketCapitalization || 0,
+      sharesOutstanding: profile.shareOutstanding || 0,
+      ipoDate: profile.ipo || profile.ipoDate || "",
+      currency: profile.currency || "",
+      country: profile.country || "",
+      phone: profile.phone || profile.phoneNumber || "",
+    };
+  }
+
+  /**
+   * Normalize an option contract
+   */
+  private normalizeOption(option: FinnhubOption): NormalizedOption {
+    return {
+      contractId: option.contractID,
+      strike: option.strike,
+      expirationDate: option.expirationDate,
+      type: option.optionType,
+      bid: option.bids && option.bids.length > 0 ? option.bids[0] : null,
+      ask: option.asks && option.asks.length > 0 ? option.asks[0] : null,
+      last: option.last,
+      openInterest: option.openInterest,
+      volume: option.volume,
+      impliedVolatility: option.iv,
+      greeks: {
+        delta: option.delta,
+        gamma: option.gamma,
+        theta: option.theta,
+        rho: option.rho,
+        vega: option.vega,
+      },
     };
   }
 
