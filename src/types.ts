@@ -324,9 +324,30 @@ export interface FinnhubOptionsChain {
 }
 
 /**
- * Normalized options chain
+ * Expiration date summary (returned when no specific date is requested)
+ */
+export interface ExpirationDateSummary {
+  expirationDate: string;
+  optionsCount: number;
+  putVolume: number;
+  callVolume: number;
+  putOpenInterest: number;
+  callOpenInterest: number;
+  impliedVolatility: number;
+}
+
+/**
+ * Normalized options chain (returned when a specific expiration date is requested)
  */
 export interface NormalizedOptionsChain {
   options: NormalizedOption[];
-  availableExpirationDates: string[];
+  expirationDate: string;
+}
+
+/**
+ * Available expirations response (returned when no specific date is requested)
+ */
+export interface AvailableExpirationsResponse {
+  availableExpirationDates: ExpirationDateSummary[];
+  totalExpirations: number;
 }

@@ -159,7 +159,7 @@ function createServer(config: ServerConfig): Server {
     {
       name: "finnhub.options.chain",
       description:
-        "Get options chain for a stock symbol. Returns option contracts with strike prices, expiration dates, bid/ask prices, and Greeks.",
+        "Get options chain for a stock symbol. If expirationDate is provided, returns full option contracts (strikes, bid/ask, Greeks) for that date. If expirationDate is omitted, returns the list of all available expiration dates with summary metadata (volume, open interest, contract counts). Use without expirationDate first to discover available dates, then call again with a specific date.",
       inputSchema: {
         type: "object",
         properties: {
@@ -169,7 +169,7 @@ function createServer(config: ServerConfig): Server {
           },
           expirationDate: {
             type: "string",
-            description: "Optional: Expiration date in YYYY-MM-DD format",
+            description: "Expiration date in YYYY-MM-DD format. If omitted, returns available expiration dates instead of contracts.",
           },
         },
         required: ["symbol"],
@@ -317,15 +317,32 @@ function createServer(config: ServerConfig): Server {
           };
         }
 
-        const result = await finnhubClient.getOptionsChain(parsed.data);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result, null, 2),
-            },
-          ],
-        };
+        if (parsed.data.expirationDate) {
+          // Specific date requested: return full option contracts
+          const result = await finnhubClient.getOptionsChain({
+            symbol: parsed.data.symbol,
+            expirationDate: parsed.data.expirationDate,
+          });
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(result, null, 2),
+              },
+            ],
+          };
+        } else {
+          // No date specified: return available expiration dates only
+          const result = await finnhubClient.getAvailableExpirations(parsed.data.symbol);
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(result, null, 2),
+              },
+            ],
+          };
+        }
       }
 
       return {

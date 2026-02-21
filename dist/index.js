@@ -16518,16 +16518,12 @@ class FinnhubClient {
   }
   async getOptionsChain(args) {
     const params = {
-      symbol: args.symbol.toUpperCase()
+      symbol: args.symbol.toUpperCase(),
+      expirationDate: args.expirationDate
     };
-    if (args.expirationDate) {
-      params.expirationDate = args.expirationDate;
-    }
     const response = await this.request("/stock/option-chain", params);
     const allOptions = [];
-    const expirationDates = [];
     for (const item of response.data || []) {
-      expirationDates.push(item.expirationDate);
       for (const opt of item.options.CALL || []) {
         allOptions.push(this.normalizeOptionContract(opt, "call"));
       }
@@ -16538,8 +16534,27 @@ class FinnhubClient {
     return {
       chain: {
         options: allOptions,
-        availableExpirationDates: expirationDates
+        expirationDate: args.expirationDate
       }
+    };
+  }
+  async getAvailableExpirations(symbol) {
+    const params = {
+      symbol: symbol.toUpperCase()
+    };
+    const response = await this.request("/stock/option-chain", params);
+    const expirations = (response.data || []).map((item) => ({
+      expirationDate: item.expirationDate,
+      optionsCount: item.optionsCount || (item.options.CALL?.length || 0) + (item.options.PUT?.length || 0),
+      putVolume: item.putVolume || 0,
+      callVolume: item.callVolume || 0,
+      putOpenInterest: item.putOpenInterest || 0,
+      callOpenInterest: item.callOpenInterest || 0,
+      impliedVolatility: item.impliedVolatility || 0
+    }));
+    return {
+      availableExpirationDates: expirations,
+      totalExpirations: expirations.length
     };
   }
   normalizeOptionContract(opt, type) {
@@ -16769,7 +16784,7 @@ function createServer(config2) {
     },
     {
       name: "finnhub.options.chain",
-      description: "Get options chain for a stock symbol. Returns option contracts with strike prices, expiration dates, bid/ask prices, and Greeks.",
+      description: "Get options chain for a stock symbol. If expirationDate is provided, returns full option contracts (strikes, bid/ask, Greeks) for that date. If expirationDate is omitted, returns the list of all available expiration dates with summary metadata (volume, open interest, contract counts). Use without expirationDate first to discover available dates, then call again with a specific date.",
       inputSchema: {
         type: "object",
         properties: {
@@ -16779,7 +16794,7 @@ function createServer(config2) {
           },
           expirationDate: {
             type: "string",
-            description: "Optional: Expiration date in YYYY-MM-DD format"
+            description: "Expiration date in YYYY-MM-DD format. If omitted, returns available expiration dates instead of contracts."
           }
         },
         required: ["symbol"]
@@ -16895,15 +16910,30 @@ function createServer(config2) {
             ]
           };
         }
-        const result = await finnhubClient.getOptionsChain(parsed.data);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result, null, 2)
-            }
-          ]
-        };
+        if (parsed.data.expirationDate) {
+          const result = await finnhubClient.getOptionsChain({
+            symbol: parsed.data.symbol,
+            expirationDate: parsed.data.expirationDate
+          });
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(result, null, 2)
+              }
+            ]
+          };
+        } else {
+          const result = await finnhubClient.getAvailableExpirations(parsed.data.symbol);
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(result, null, 2)
+              }
+            ]
+          };
+        }
       }
       return {
         content: [

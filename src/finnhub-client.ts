@@ -12,11 +12,12 @@ import type {
   StockProfileArgs,
   FinnhubProfile,
   NormalizedProfile,
-  OptionsChainArgs,
   FinnhubOptionsChain,
   FinnhubOptionContract,
   NormalizedOption,
   NormalizedOptionsChain,
+  ExpirationDateSummary,
+  AvailableExpirationsResponse,
 } from "./types.js";
 
 /**
@@ -166,41 +167,24 @@ export class FinnhubClient {
   }
 
   /**
-   * Get options chain
+   * Get options chain for a specific expiration date
    */
-  async getOptionsChain(args: OptionsChainArgs): Promise<{
+  async getOptionsChain(args: { symbol: string; expirationDate: string }): Promise<{
     chain: NormalizedOptionsChain;
   }> {
     const params: Record<string, string> = {
       symbol: args.symbol.toUpperCase(),
+      expirationDate: args.expirationDate,
     };
 
-    if (args.expirationDate) {
-      params.expirationDate = args.expirationDate;
-    }
-
-    const response = await this.request<{
-      data: Array<{
-        expirationDate: string;
-        options: {
-          CALL: FinnhubOptionContract[];
-          PUT: FinnhubOptionContract[];
-        };
-      }>;
-    }>("/stock/option-chain", params);
+    const response = await this.request<FinnhubOptionsChain>("/stock/option-chain", params);
 
     const allOptions: NormalizedOption[] = [];
-    const expirationDates: string[] = [];
 
     for (const item of response.data || []) {
-      expirationDates.push(item.expirationDate);
-      
-      // Process CALL options
       for (const opt of item.options.CALL || []) {
         allOptions.push(this.normalizeOptionContract(opt, "call"));
       }
-      
-      // Process PUT options
       for (const opt of item.options.PUT || []) {
         allOptions.push(this.normalizeOptionContract(opt, "put"));
       }
@@ -209,8 +193,34 @@ export class FinnhubClient {
     return {
       chain: {
         options: allOptions,
-        availableExpirationDates: expirationDates,
+        expirationDate: args.expirationDate,
       },
+    };
+  }
+
+  /**
+   * Get available expiration dates for a symbol's options chain
+   */
+  async getAvailableExpirations(symbol: string): Promise<AvailableExpirationsResponse> {
+    const params: Record<string, string> = {
+      symbol: symbol.toUpperCase(),
+    };
+
+    const response = await this.request<FinnhubOptionsChain>("/stock/option-chain", params);
+
+    const expirations: ExpirationDateSummary[] = (response.data || []).map((item) => ({
+      expirationDate: item.expirationDate,
+      optionsCount: item.optionsCount || (item.options.CALL?.length || 0) + (item.options.PUT?.length || 0),
+      putVolume: item.putVolume || 0,
+      callVolume: item.callVolume || 0,
+      putOpenInterest: item.putOpenInterest || 0,
+      callOpenInterest: item.callOpenInterest || 0,
+      impliedVolatility: item.impliedVolatility || 0,
+    }));
+
+    return {
+      availableExpirationDates: expirations,
+      totalExpirations: expirations.length,
     };
   }
 
