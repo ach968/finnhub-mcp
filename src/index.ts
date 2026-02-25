@@ -159,7 +159,14 @@ function createServer(config: ServerConfig): Server {
     {
       name: "finnhub.options.chain",
       description:
-        "Get options chain for a stock symbol. If expirationDate is provided, returns full option contracts (strikes, bid/ask, Greeks) for that date. If expirationDate is omitted, returns the list of all available expiration dates with summary metadata (volume, open interest, contract counts). Use without expirationDate first to discover available dates, then call again with a specific date.",
+        "Get options chain for a stock symbol. This tool has TWO modes depending on whether expirationDate is provided:\n\n" +
+        "MODE 1 — Discovery (expirationDate OMITTED): Returns all available expiration dates with summary metadata (volume, open interest, implied volatility, contract counts). Use this first to see what dates exist.\n\n" +
+        "MODE 2 — Full chain (expirationDate PROVIDED): Returns every individual option contract (calls and puts) for that expiration date, each with: strike price, bid/ask, last price, open interest, volume, implied volatility, and full Greeks (delta, gamma, theta, vega, rho).\n\n" +
+        "RECOMMENDED WORKFLOW for agents:\n" +
+        "  Step 1: Call with just symbol (no expirationDate) to get available expiration dates.\n" +
+        "  Step 2: Pick an expiration date from the results.\n" +
+        "  Step 3: Call again with symbol + expirationDate to get full contracts with Greeks.\n\n" +
+        "IMPORTANT: Greeks and bid/ask data are ONLY returned in Mode 2 (when expirationDate is provided). Mode 1 only returns date-level summaries, not individual contracts.",
       inputSchema: {
         type: "object",
         properties: {
@@ -169,7 +176,7 @@ function createServer(config: ServerConfig): Server {
           },
           expirationDate: {
             type: "string",
-            description: "Expiration date in YYYY-MM-DD format. If omitted, returns available expiration dates instead of contracts.",
+            description: "Expiration date in YYYY-MM-DD format. CRITICAL: When omitted, the tool returns available expiration dates (no contracts/Greeks). When provided, returns full option contracts with Greeks for that date. You MUST provide this to get strike prices, bid/ask, and Greeks.",
           },
         },
         required: ["symbol"],
